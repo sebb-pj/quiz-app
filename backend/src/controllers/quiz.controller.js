@@ -32,8 +32,8 @@ export const addQuestion = async (req, res) => {
             answers: []
         });
 
-        await Quiz.findByIdAndUpdate(quizId, { 
-            $push: { question: question._id } 
+        await Quiz.findByIdAndUpdate(quizId, {
+            $push: { question: question._id }
         });
 
         res.status(201).json(question);
@@ -67,13 +67,14 @@ export const addResult = async (req, res) => {
 
         const quiz = await Quiz.findByIdAndUpdate(
             quizId,
-            { $push: { 
-                results: {
-                    trait: req.body.trait,
-                    title: req.body.title,
-                    description: req.body.description
+            {
+                $push: {
+                    results: {
+                        trait: req.body.trait,
+                        title: req.body.title,
+                        description: req.body.description
                     }
-                }    
+                }
             },
             { new: true }
         );
@@ -92,31 +93,28 @@ export const submitQuiz = async (req, res) => {
     const scores = {};
 
     questions.forEach((q) => {
-        const userAnswer = answers.find((a) => a.questionId === q._id);
+        const userAnswer = answers.find(a => a.questionId === q._id.toString());
         if (!userAnswer) return;
 
         const answer = q.answers.id(userAnswer.answerId);
         if (!answer) return;
 
-        for (const [trait, points] of answer.traits.entries()) {
+        // Convert Map to iterable
+        const traitsMap = answer.traits; // this is a Map
+        for (const [trait, points] of traitsMap) {
             scores[trait] = (scores[trait] || 0) + points;
         }
     });
 
-    const resultTrait = Object.keys(scores).reduce((a, b) => 
-        scores[a] > scores[b] ? a : b
-    );
+    if (Object.keys(scores).length === 0) {
+        return res.status(400).json({ message: "No valid answers submitted" });
+    }
 
-    await QuizAnalytics.findOneAndUpdate(
-        { quizId: req.params.id },
-        { 
-            $inc: { 
-                totalAttempts: 1, 
-                [`resultCounts.${resultTrait}`]: 1 
-            },
-            lastAttemptAt: new Date()
-        }
-    );
-   
-    res.json({ result: resultTrait, scores})
+    // Safely get the highest scoring trait
+    const resultTrait = Object.entries(scores).reduce(
+        (max, [trait, score]) => (score > max.score ? { trait, score } : max),
+        { trait: null, score: -Infinity }
+    ).trait;
+
+    res.json({ result: resultTrait, scores });
 };
