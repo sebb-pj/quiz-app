@@ -150,7 +150,7 @@ export const getQuizById = async (req, res) => {
       return res.status(404).json({ message: "Quiz not found" });
     }
 
-    const questions = await Question.find({ quizId: quiz._id });
+    const questions = await Question.find({ quizId: quiz._id }).select("-answers.traits");
 
     res.json({
       ...quiz.toObject(),
