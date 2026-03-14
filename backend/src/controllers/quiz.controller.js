@@ -86,35 +86,79 @@ export const addResult = async (req, res) => {
 };
 
 export const submitQuiz = async (req, res) => {
+  try {
     const { answers } = req.body;
+
+    console.log("Submitted answers:", answers);
 
     const questions = await Question.find({ quizId: req.params.id });
 
     const scores = {};
 
     questions.forEach((q) => {
-        const userAnswer = answers.find(a => a.questionId === q._id.toString());
-        if (!userAnswer) return;
+      // this snippet finds the user's answer for this question
+      const userAnswer = answers.find(
+        (a) => a.questionId === q._id.toString()
+      );
 
-        const answer = q.answers.id(userAnswer.answerId);
-        if (!answer) return;
+      if (!userAnswer) return;
 
-        // Convert Map to iterable
-        const traitsMap = answer.traits; // this is a Map
-        for (const [trait, points] of traitsMap) {
-            scores[trait] = (scores[trait] || 0) + points;
-        }
+      // this should find the answer inside the question
+      const answer = q.answers.id(userAnswer.answerId);
+
+      console.log("Matched answer:", answer);
+
+      if (!answer || !answer.traits) return;
+
+      // this turns traits into a plain object
+      for (const [trait, points] of Object.entries(answer.traits)) {
+        scores[trait] = (scores[trait] || 0) + points;
+      }
     });
 
+    console.log("Scores object:", scores);
+
+    // if nothing was scored return an error
     if (Object.keys(scores).length === 0) {
-        return res.status(400).json({ message: "No valid answers submitted" });
+      return res.status(400).json({
+        message: "No valid answers submitted",
+      });
     }
 
-    // Safely get the highest scoring trait
+    // this part determines highest scoring trait
     const resultTrait = Object.entries(scores).reduce(
-        (max, [trait, score]) => (score > max.score ? { trait, score } : max),
-        { trait: null, score: -Infinity }
+      (max, [trait, score]) =>
+        score > max.score ? { trait, score } : max,
+      { trait: null, score: -Infinity }
     ).trait;
 
-    res.json({ result: resultTrait, scores });
+    res.json({
+      result: resultTrait,
+      scores,
+    });
+  } catch (error) {
+    console.error("Submit quiz error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getQuizById = async (req, res) => {
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+
+    if (!quiz) {
+      return res.status(404).json({ message: "Quiz not found" });
+    }
+
+    const questions = await Question.find({ quizId: quiz._id }).select("-answers.traits");
+
+    res.json({
+      ...quiz.toObject(),
+      questions
+    });
+
+  } catch (error) {
+    console.error("Get quiz error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
