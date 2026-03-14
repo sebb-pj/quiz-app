@@ -141,3 +141,24 @@ export const submitQuiz = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getQuizById = async (req, res) => {
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+
+    if (!quiz) {
+      return res.status(404).json({ message: "Quiz not found" });
+    }
+
+    const questions = await Question.find({ quizId: quiz._id });
+
+    res.json({
+      ...quiz.toObject(),
+      questions
+    });
+
+  } catch (error) {
+    console.error("Get quiz error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
